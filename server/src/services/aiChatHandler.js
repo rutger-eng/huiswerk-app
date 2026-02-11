@@ -2,9 +2,13 @@ import OpenAI from 'openai';
 import { studentDb, homeworkDb, userDb, scheduleDb, teacherDb } from '../database/db-adapter.js';
 import { parseHomeworkText } from './homeworkParser.js';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// Only initialize OpenAI if API key is available
+let openai = null;
+if (process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+  });
+}
 
 // Conversation context per user (chat_id)
 const conversationHistory = new Map();
@@ -401,6 +405,11 @@ async function handleShowTeachers(user) {
 
 // Main AI chat handler
 export async function handleAIChat(chatId, userMessage, userType, user) {
+  // Return error if OpenAI is not configured
+  if (!openai) {
+    return 'AI chat is niet beschikbaar. OpenAI API key is niet geconfigureerd.';
+  }
+
   try {
     // Add user message to history
     addToConversation(chatId, 'user', userMessage);
