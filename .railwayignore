@@ -1,0 +1,7 @@
+node_modules/
+.git/
+.env
+*.log
+database.sqlite
+client/node_modules/
+client/dist/
