@@ -39,4 +39,16 @@ router.get('/telegram-webhook-info', async (req, res) => {
   }
 });
 
+// Diagnostic endpoint to check database and environment
+router.get('/diagnostic', async (req, res) => {
+  res.json({
+    database: process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite',
+    databaseUrl: process.env.DATABASE_URL ? 'Set (hidden)' : 'Not set',
+    openaiKey: process.env.OPENAI_API_KEY ? 'Set (hidden)' : 'Not set',
+    telegramToken: process.env.TELEGRAM_BOT_TOKEN ? 'Set (hidden)' : 'Not set',
+    nodeEnv: process.env.NODE_ENV,
+    railwayDomain: process.env.RAILWAY_PUBLIC_DOMAIN || 'Not set'
+  });
+});
+
 export default router;
