@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.js';
 import studentRoutes from './routes/students.js';
 import homeworkRoutes from './routes/homework.js';
+import telegramRoutes from './routes/telegram.js';
 import { initBot } from './services/telegramBot.js';
 import { startScheduler } from './services/scheduler.js';
 
@@ -46,6 +47,7 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/homework', homeworkRoutes);
+app.use('/api', telegramRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

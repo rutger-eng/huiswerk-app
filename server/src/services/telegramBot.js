@@ -2,6 +2,10 @@ import TelegramBot from 'node-telegram-bot-api';
 import { studentDb, homeworkDb } from '../database/db-adapter.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
+const RAILWAY_PUBLIC_URL = process.env.RAILWAY_PUBLIC_DOMAIN
+  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  : process.env.RAILWAY_STATIC_URL || 'https://huiswerk-app.up.railway.app';
+
 let bot = null;
 
 // Initialize bot
@@ -12,8 +16,28 @@ export function initBot() {
   }
 
   try {
-    bot = new TelegramBot(token, { polling: true });
-    console.log('✅ Telegram bot initialized successfully');
+    // Use webhook for production (Railway), polling for development
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    if (isProduction) {
+      // Initialize bot without polling (webhook mode)
+      bot = new TelegramBot(token, { polling: false });
+      console.log('✅ Telegram bot initialized (webhook mode)');
+
+      // Set webhook URL
+      const webhookUrl = `${RAILWAY_PUBLIC_URL}/api/telegram-webhook`;
+      bot.setWebHook(webhookUrl)
+        .then(() => {
+          console.log(`✅ Telegram webhook set to: ${webhookUrl}`);
+        })
+        .catch((error) => {
+          console.error('❌ Failed to set webhook:', error.message);
+        });
+    } else {
+      // Development mode: use polling
+      bot = new TelegramBot(token, { polling: true });
+      console.log('✅ Telegram bot initialized (polling mode)');
+    }
 
     setupCommands();
     setupMessageHandler();
@@ -23,6 +47,11 @@ export function initBot() {
     console.error('❌ Failed to initialize Telegram bot:', error.message);
     return null;
   }
+}
+
+// Get bot instance for webhook handling
+export function getBot() {
+  return bot;
 }
 
 // Get student by chat ID
