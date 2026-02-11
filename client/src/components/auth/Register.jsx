@@ -8,6 +8,12 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [city, setCity] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [showOptional, setShowOptional] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -31,7 +37,16 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const response = await authApi.register(email, password, name);
+      const response = await authApi.register(
+        email,
+        password,
+        name,
+        phone || undefined,
+        address || undefined,
+        postalCode || undefined,
+        city || undefined,
+        birthDate || undefined
+      );
       login(response.data.token, response.data.user);
       navigate('/');
     } catch (err) {
@@ -124,6 +139,100 @@ export default function Register() {
                 placeholder="••••••••"
               />
             </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowOptional(!showOptional)}
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                {showOptional ? '- Verberg optionele velden' : '+ Voeg contactgegevens toe (optioneel)'}
+              </button>
+            </div>
+
+            {showOptional && (
+              <div className="space-y-4 pt-2 border-t">
+                <p className="text-xs text-gray-500">
+                  Deze velden zijn optioneel en kunnen later worden ingevuld.
+                </p>
+
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                    Telefoonnummer
+                  </label>
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="06-12345678"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                    Adres
+                  </label>
+                  <input
+                    id="address"
+                    name="address"
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Straatnaam 123"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700">
+                      Postcode
+                    </label>
+                    <input
+                      id="postalCode"
+                      name="postalCode"
+                      type="text"
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="1234 AB"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+                      Plaats
+                    </label>
+                    <input
+                      id="city"
+                      name="city"
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Amsterdam"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="birthDate" className="block text-sm font-medium text-gray-700">
+                    Geboortedatum
+                  </label>
+                  <input
+                    id="birthDate"
+                    name="birthDate"
+                    type="date"
+                    value={birthDate}
+                    onChange={(e) => setBirthDate(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

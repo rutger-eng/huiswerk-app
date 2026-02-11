@@ -36,6 +36,23 @@ function initializeDatabase() {
       )
     `);
 
+    // Add new columns to users table (with error handling for existing columns)
+    db.run('ALTER TABLE users ADD COLUMN phone TEXT', (err) => {
+      if (err && !err.message.includes('duplicate column')) console.error('Error adding phone column:', err);
+    });
+    db.run('ALTER TABLE users ADD COLUMN address TEXT', (err) => {
+      if (err && !err.message.includes('duplicate column')) console.error('Error adding address column:', err);
+    });
+    db.run('ALTER TABLE users ADD COLUMN postal_code TEXT', (err) => {
+      if (err && !err.message.includes('duplicate column')) console.error('Error adding postal_code column:', err);
+    });
+    db.run('ALTER TABLE users ADD COLUMN city TEXT', (err) => {
+      if (err && !err.message.includes('duplicate column')) console.error('Error adding city column:', err);
+    });
+    db.run('ALTER TABLE users ADD COLUMN birth_date DATE', (err) => {
+      if (err && !err.message.includes('duplicate column')) console.error('Error adding birth_date column:', err);
+    });
+
     // Students table
     db.run(`
       CREATE TABLE IF NOT EXISTS students (
@@ -50,6 +67,72 @@ function initializeDatabase() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (parent_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+
+    // Add new columns to students table
+    db.run('ALTER TABLE students ADD COLUMN year INTEGER', (err) => {
+      if (err && !err.message.includes('duplicate column')) console.error('Error adding year column:', err);
+    });
+    db.run('ALTER TABLE students ADD COLUMN level TEXT', (err) => {
+      if (err && !err.message.includes('duplicate column')) console.error('Error adding level column:', err);
+    });
+    db.run('ALTER TABLE students ADD COLUMN birth_date DATE', (err) => {
+      if (err && !err.message.includes('duplicate column')) console.error('Error adding birth_date column:', err);
+    });
+    db.run('ALTER TABLE students ADD COLUMN school_id INTEGER REFERENCES schools(id) ON DELETE SET NULL', (err) => {
+      if (err && !err.message.includes('duplicate column')) console.error('Error adding school_id column:', err);
+    });
+
+    // Schools table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS schools (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        address TEXT,
+        postal_code TEXT,
+        city TEXT,
+        website TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Teachers table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS teachers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        subjects TEXT,
+        email TEXT,
+        phone TEXT,
+        school_id INTEGER REFERENCES schools(id) ON DELETE SET NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Schedule table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS schedule (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+        day_of_week INTEGER NOT NULL,
+        time_start TEXT NOT NULL,
+        time_end TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        teacher_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
+        location TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Student-Teachers junction table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS student_teachers (
+        student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+        teacher_id INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+        subject TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (student_id, teacher_id, subject)
       )
     `);
 
@@ -310,6 +393,214 @@ export const homeworkDb = {
     return await getAll(
       'SELECT * FROM homework WHERE student_id = ? AND subject LIKE ? AND completed = 0 ORDER BY deadline',
       [studentId, `%${subject}%`]
+    );
+  }
+};
+
+// School operations
+export const schoolDb = {
+  create: async (name, address, postal_code, city, website) => {
+    const result = await runQuery(
+      'INSERT INTO schools (name, address, postal_code, city, website) VALUES (?, ?, ?, ?, ?)',
+      [name, address, postal_code, city, website]
+    );
+    return result.lastID;
+  },
+
+  getAll: async () => {
+    return await getAll('SELECT * FROM schools ORDER BY name');
+  },
+
+  findById: async (id) => {
+    return await getOne('SELECT * FROM schools WHERE id = ?', [id]);
+  },
+
+  searchByName: async (searchTerm) => {
+    return await getAll(
+      'SELECT * FROM schools WHERE name LIKE ? ORDER BY name',
+      [`%${searchTerm}%`]
+    );
+  },
+
+  update: async (id, updates) => {
+    const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const values = [...Object.values(updates), id];
+    return await runQuery(`UPDATE schools SET ${fields} WHERE id = ?`, values);
+  },
+
+  delete: async (id) => {
+    return await runQuery('DELETE FROM schools WHERE id = ?', [id]);
+  }
+};
+
+// Teacher operations
+export const teacherDb = {
+  create: async (name, subjects, email, phone, school_id) => {
+    const subjectsJson = Array.isArray(subjects) ? JSON.stringify(subjects) : subjects;
+    const result = await runQuery(
+      'INSERT INTO teachers (name, subjects, email, phone, school_id) VALUES (?, ?, ?, ?, ?)',
+      [name, subjectsJson, email, phone, school_id]
+    );
+    return result.lastID;
+  },
+
+  getAll: async () => {
+    const teachers = await getAll('SELECT * FROM teachers ORDER BY name');
+    return teachers.map(t => ({
+      ...t,
+      subjects: t.subjects ? JSON.parse(t.subjects) : []
+    }));
+  },
+
+  findById: async (id) => {
+    const teacher = await getOne('SELECT * FROM teachers WHERE id = ?', [id]);
+    if (teacher && teacher.subjects) {
+      teacher.subjects = JSON.parse(teacher.subjects);
+    }
+    return teacher;
+  },
+
+  findBySchoolId: async (schoolId) => {
+    const teachers = await getAll(
+      'SELECT * FROM teachers WHERE school_id = ? ORDER BY name',
+      [schoolId]
+    );
+    return teachers.map(t => ({
+      ...t,
+      subjects: t.subjects ? JSON.parse(t.subjects) : []
+    }));
+  },
+
+  findBySubject: async (subject) => {
+    const teachers = await getAll(
+      'SELECT * FROM teachers WHERE subjects LIKE ? ORDER BY name',
+      [`%${subject}%`]
+    );
+    return teachers.map(t => ({
+      ...t,
+      subjects: t.subjects ? JSON.parse(t.subjects) : []
+    }));
+  },
+
+  findByStudentId: async (studentId) => {
+    const teachers = await getAll(
+      `SELECT DISTINCT t.*, st.subject as teaching_subject
+       FROM teachers t
+       INNER JOIN student_teachers st ON t.id = st.teacher_id
+       WHERE st.student_id = ?
+       ORDER BY t.name`,
+      [studentId]
+    );
+    return teachers.map(t => ({
+      ...t,
+      subjects: t.subjects ? JSON.parse(t.subjects) : []
+    }));
+  },
+
+  update: async (id, updates) => {
+    if (updates.subjects && Array.isArray(updates.subjects)) {
+      updates.subjects = JSON.stringify(updates.subjects);
+    }
+    const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const values = [...Object.values(updates), id];
+    return await runQuery(`UPDATE teachers SET ${fields} WHERE id = ?`, values);
+  },
+
+  delete: async (id) => {
+    return await runQuery('DELETE FROM teachers WHERE id = ?', [id]);
+  }
+};
+
+// Schedule operations
+export const scheduleDb = {
+  create: async (studentId, dayOfWeek, timeStart, timeEnd, subject, teacherId, location) => {
+    const result = await runQuery(
+      'INSERT INTO schedule (student_id, day_of_week, time_start, time_end, subject, teacher_id, location) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [studentId, dayOfWeek, timeStart, timeEnd, subject, teacherId, location]
+    );
+    return result.lastID;
+  },
+
+  findByStudentId: async (studentId) => {
+    return await getAll(
+      'SELECT * FROM schedule WHERE student_id = ? ORDER BY day_of_week, time_start',
+      [studentId]
+    );
+  },
+
+  findByStudentIdAndDay: async (studentId, dayOfWeek) => {
+    return await getAll(
+      'SELECT * FROM schedule WHERE student_id = ? AND day_of_week = ? ORDER BY time_start',
+      [studentId, dayOfWeek]
+    );
+  },
+
+  getTodaySchedule: async (studentId) => {
+    const today = new Date().getDay();
+    return await getAll(
+      'SELECT * FROM schedule WHERE student_id = ? AND day_of_week = ? ORDER BY time_start',
+      [studentId, today]
+    );
+  },
+
+  findById: async (id) => {
+    return await getOne('SELECT * FROM schedule WHERE id = ?', [id]);
+  },
+
+  update: async (id, updates) => {
+    const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const values = [...Object.values(updates), id];
+    return await runQuery(`UPDATE schedule SET ${fields} WHERE id = ?`, values);
+  },
+
+  delete: async (id) => {
+    return await runQuery('DELETE FROM schedule WHERE id = ?', [id]);
+  },
+
+  deleteByStudentId: async (studentId) => {
+    return await runQuery('DELETE FROM schedule WHERE student_id = ?', [studentId]);
+  }
+};
+
+// Student-Teacher junction operations
+export const studentTeacherDb = {
+  link: async (studentId, teacherId, subject) => {
+    return await runQuery(
+      'INSERT OR IGNORE INTO student_teachers (student_id, teacher_id, subject) VALUES (?, ?, ?)',
+      [studentId, teacherId, subject]
+    );
+  },
+
+  unlink: async (studentId, teacherId, subject) => {
+    return await runQuery(
+      'DELETE FROM student_teachers WHERE student_id = ? AND teacher_id = ? AND subject = ?',
+      [studentId, teacherId, subject]
+    );
+  },
+
+  getTeachersByStudent: async (studentId) => {
+    const teachers = await getAll(
+      `SELECT t.*, st.subject as teaching_subject
+       FROM teachers t
+       INNER JOIN student_teachers st ON t.id = st.teacher_id
+       WHERE st.student_id = ?
+       ORDER BY t.name`,
+      [studentId]
+    );
+    return teachers.map(t => ({
+      ...t,
+      subjects: t.subjects ? JSON.parse(t.subjects) : []
+    }));
+  },
+
+  getStudentsByTeacher: async (teacherId) => {
+    return await getAll(
+      `SELECT s.*, st.subject
+       FROM students s
+       INNER JOIN student_teachers st ON s.id = st.student_id
+       WHERE st.teacher_id = ?
+       ORDER BY s.name`,
+      [teacherId]
     );
   }
 };

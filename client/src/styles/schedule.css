@@ -1,0 +1,160 @@
+/* Schedule Grid Styling */
+.schedule-grid-container {
+  width: 100%;
+}
+
+.schedule-grid {
+  font-size: 0.9rem;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.schedule-grid th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  padding: 12px 8px;
+  border: 1px solid #dee2e6;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.schedule-grid td.time-slot {
+  background-color: #f8f9fa;
+  text-align: center;
+  vertical-align: middle;
+  font-weight: 500;
+  padding: 8px;
+  border: 1px solid #dee2e6;
+  min-width: 80px;
+}
+
+.schedule-grid td.schedule-cell {
+  height: 70px;
+  vertical-align: middle;
+  position: relative;
+  transition: all 0.2s;
+  border: 1px solid #dee2e6;
+  padding: 8px;
+}
+
+.schedule-grid td.schedule-cell.has-lesson {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  border-left: 3px solid #2196f3;
+}
+
+.schedule-grid td.schedule-cell.has-lesson:hover {
+  background: linear-gradient(135deg, #bbdefb 0%, #90caf9 100%);
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+  transform: translateY(-1px);
+  cursor: pointer;
+}
+
+.schedule-grid td.schedule-cell.empty-cell {
+  background-color: #ffffff;
+}
+
+.schedule-grid td.schedule-cell.empty-cell:hover {
+  background-color: #f5f5f5;
+  cursor: pointer;
+}
+
+.lesson-content {
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lesson-subject {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1976d2;
+  margin-bottom: 4px;
+}
+
+.lesson-teacher {
+  font-size: 0.75rem;
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lesson-teacher::before {
+  content: '👤';
+  font-size: 0.7rem;
+}
+
+.lesson-location {
+  font-size: 0.75rem;
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.empty-cell-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+  font-size: 0.8rem;
+}
+
+/* Modal styling */
+.modal.show {
+  display: block;
+}
+
+.modal-backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Import wizard */
+.import-wizard-step {
+  min-height: 300px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .schedule-grid {
+    font-size: 0.75rem;
+  }
+
+  .schedule-grid th,
+  .schedule-grid td {
+    padding: 6px 4px;
+  }
+
+  .schedule-grid td.schedule-cell {
+    height: 60px;
+  }
+
+  .lesson-subject {
+    font-size: 0.8rem;
+  }
+
+  .lesson-teacher,
+  .lesson-location {
+    font-size: 0.7rem;
+  }
+}
+
+/* Print styling */
+@media print {
+  .schedule-grid-container button {
+    display: none;
+  }
+
+  .schedule-grid {
+    border: 1px solid #000;
+  }
+
+  .schedule-grid td.schedule-cell.has-lesson {
+    background: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

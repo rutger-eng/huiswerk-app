@@ -7,6 +7,9 @@ import authRoutes from './routes/auth.js';
 import studentRoutes from './routes/students.js';
 import homeworkRoutes from './routes/homework.js';
 import telegramRoutes from './routes/telegram.js';
+import schoolRoutes from './routes/schools.js';
+import teacherRoutes from './routes/teachers.js';
+import scheduleRoutes from './routes/schedule.js';
 import { initBot } from './services/telegramBot.js';
 import { startScheduler } from './services/scheduler.js';
 
@@ -47,6 +50,9 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/homework', homeworkRoutes);
+app.use('/api/schools', schoolRoutes);
+app.use('/api/teachers', teacherRoutes);
+app.use('/api/schedule', scheduleRoutes);
 app.use('/api', telegramRoutes);
 
 // Health check
@@ -77,6 +83,9 @@ if (process.env.NODE_ENV === 'production') {
         auth: '/api/auth',
         students: '/api/students',
         homework: '/api/homework',
+        schools: '/api/schools',
+        teachers: '/api/teachers',
+        schedule: '/api/schedule',
         health: '/api/health'
       }
     });

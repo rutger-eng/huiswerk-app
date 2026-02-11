@@ -57,7 +57,7 @@ export default function ParentDashboard() {
 
     setAddingStudent(true);
     try {
-      await studentsApi.create(newStudentName);
+      await studentsApi.create({ name: newStudentName });
       setNewStudentName('');
       setShowAddForm(false);
       fetchStudents();
@@ -223,7 +223,16 @@ export default function ParentDashboard() {
               >
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">{student.name}</h3>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">{student.name}</h3>
+                      {(student.year || student.level) && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          {student.year && `Leerjaar ${student.year}`}
+                          {student.year && student.level && ' • '}
+                          {student.level && student.level.toUpperCase()}
+                        </p>
+                      )}
+                    </div>
                     {student.telegram_linked ? (
                       <span className="flex items-center text-green-600 text-sm">
                         <svg className="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 20 20">

@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import ParentDashboard from './components/parent/ParentDashboard';
+import StudentDetail from './components/StudentDetail';
 import Dashboard from './components/Dashboard';
 import Calendar from './components/Calendar';
 import HomeworkForm from './components/HomeworkForm';
 import TextParser from './components/TextParser';
 import { authApi } from './services/api';
+import './styles/schedule.css';
 
 // Auth Context
 export const AuthContext = React.createContext(null);
@@ -72,7 +74,15 @@ function App() {
             element={user ? <ParentDashboard /> : <Navigate to="/login" />}
           />
           <Route
+            path="/dashboard"
+            element={user ? <ParentDashboard /> : <Navigate to="/login" />}
+          />
+          <Route
             path="/student/:id"
+            element={user ? <StudentDetail /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/student/:id/homework"
             element={user ? <Dashboard /> : <Navigate to="/login" />}
           />
           <Route

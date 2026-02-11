@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { studentDb, homeworkDb, userDb } from '../database/db-adapter.js';
+import { studentDb, homeworkDb, userDb, scheduleDb, teacherDb } from '../database/db-adapter.js';
 import { parseHomeworkText } from './homeworkParser.js';
 
 const openai = new OpenAI({
@@ -54,6 +54,8 @@ Je kunt:
 - Huiswerk voor vandaag of deze week tonen
 - Huiswerk als afgerond markeren
 - Status updates geven
+- Rooster voor vandaag bekijken
+- Informatie over docenten tonen
 
 Wees vriendelijk, motiverend en behulpzaam. Gebruik Nederlands.`;
   }
@@ -131,6 +133,22 @@ const functions = [
       type: 'object',
       properties: {}
     }
+  },
+  {
+    name: 'show_schedule',
+    description: 'Toon het rooster voor vandaag (alleen voor studenten)',
+    parameters: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'show_teachers',
+    description: 'Toon lijst van docenten voor de student',
+    parameters: {
+      type: 'object',
+      properties: {}
+    }
   }
 ];
 
@@ -148,6 +166,12 @@ async function executeFunction(functionName, args, userType, user) {
 
     case 'show_status':
       return await handleShowStatus(user);
+
+    case 'show_schedule':
+      return await handleShowSchedule(user);
+
+    case 'show_teachers':
+      return await handleShowTeachers(user);
 
     default:
       return { error: 'Unknown function' };
@@ -311,6 +335,67 @@ async function handleShowStatus(user) {
   } catch (error) {
     console.error('Error in handleShowStatus:', error);
     return { error: 'Er ging iets mis bij het ophalen van status' };
+  }
+}
+
+// Show schedule handler
+async function handleShowSchedule(user) {
+  try {
+    const schedule = await scheduleDb.getTodaySchedule(user.id);
+
+    if (schedule.length === 0) {
+      return { success: true, message: 'Geen lessen gepland voor vandaag' };
+    }
+
+    const lessons = [];
+    for (const lesson of schedule) {
+      const lessonData = {
+        time: `${lesson.time_start} - ${lesson.time_end}`,
+        subject: lesson.subject,
+        location: lesson.location
+      };
+
+      if (lesson.teacher_id) {
+        try {
+          const teacher = await teacherDb.findById(lesson.teacher_id);
+          if (teacher) {
+            lessonData.teacher = teacher.name;
+          }
+        } catch (err) {
+          console.error('Error fetching teacher:', err);
+        }
+      }
+
+      lessons.push(lessonData);
+    }
+
+    return { success: true, data: lessons };
+  } catch (error) {
+    console.error('Error in handleShowSchedule:', error);
+    return { error: 'Er ging iets mis bij het ophalen van je rooster' };
+  }
+}
+
+// Show teachers handler
+async function handleShowTeachers(user) {
+  try {
+    const teachers = await teacherDb.findByStudentId(user.id);
+
+    if (teachers.length === 0) {
+      return { success: true, message: 'Geen docenten gevonden' };
+    }
+
+    const teacherList = teachers.map(teacher => ({
+      name: teacher.name,
+      subject: teacher.teaching_subject,
+      email: teacher.email,
+      phone: teacher.phone
+    }));
+
+    return { success: true, data: teacherList };
+  } catch (error) {
+    console.error('Error in handleShowTeachers:', error);
+    return { error: 'Er ging iets mis bij het ophalen van je docenten' };
   }
 }
 

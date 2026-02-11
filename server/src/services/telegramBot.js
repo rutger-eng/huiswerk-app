@@ -1,5 +1,5 @@
 import TelegramBot from 'node-telegram-bot-api';
-import { studentDb, homeworkDb, userDb } from '../database/db-adapter.js';
+import { studentDb, homeworkDb, userDb, scheduleDb, teacherDb } from '../database/db-adapter.js';
 import * as parentCommands from './parentTelegramCommands.js';
 import { handleAIChat } from './aiChatHandler.js';
 
@@ -108,7 +108,9 @@ function setupCommands() {
           `Gebruik deze commando's:\n` +
           `/today - Huiswerk voor vandaag\n` +
           `/week - Huiswerk voor deze week\n` +
-          `/done [vak] - Markeer huiswerk als af`
+          `/done [vak] - Markeer huiswerk als af\n` +
+          `/rooster - Rooster voor vandaag\n` +
+          `/docenten - Lijst van je docenten`
         );
       } else {
         bot.sendMessage(
@@ -143,7 +145,9 @@ function setupCommands() {
         `Hoi ${student.name}! Je kunt nu:\n` +
         `/today - Huiswerk voor vandaag bekijken\n` +
         `/week - Huiswerk voor deze week bekijken\n` +
-        `/done [vak] - Huiswerk markeren als af\n\n` +
+        `/done [vak] - Huiswerk markeren als af\n` +
+        `/rooster - Rooster voor vandaag bekijken\n` +
+        `/docenten - Je docenten bekijken\n\n` +
         `Je krijgt elke ochtend een overzicht van je huiswerk!`
       );
     } catch (error) {
@@ -296,6 +300,120 @@ function setupCommands() {
     }
   });
 
+  // /rooster command - show today's schedule (students only)
+  bot.onText(/\/rooster/, async (msg) => {
+    const chatId = msg.chat.id;
+    const student = await getStudentByChatId(chatId);
+
+    if (!student) {
+      bot.sendMessage(
+        chatId,
+        '❌ Je account is nog niet gekoppeld.\n\n' +
+        'Gebruik /start [CODE] om je account te koppelen.'
+      );
+      return;
+    }
+
+    try {
+      const schedule = await scheduleDb.getTodaySchedule(student.id);
+
+      if (schedule.length === 0) {
+        const dayNames = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'];
+        const today = dayNames[new Date().getDay()];
+        bot.sendMessage(
+          chatId,
+          `📅 Geen lessen gepland voor vandaag (${today})! 🎉`
+        );
+        return;
+      }
+
+      const dayNames = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'];
+      const today = dayNames[new Date().getDay()];
+
+      let message = `📅 *Rooster voor vandaag (${today})*\n\n`;
+
+      for (const lesson of schedule) {
+        message += `🕐 ${lesson.time_start} - ${lesson.time_end}\n`;
+        message += `📚 *${lesson.subject}*\n`;
+
+        if (lesson.teacher_id) {
+          try {
+            const teacher = await teacherDb.findById(lesson.teacher_id);
+            if (teacher) {
+              message += `👨‍🏫 ${teacher.name}\n`;
+            }
+          } catch (err) {
+            console.error('Error fetching teacher:', err);
+          }
+        }
+
+        if (lesson.location) {
+          message += `📍 Lokaal ${lesson.location}\n`;
+        }
+
+        message += '\n';
+      }
+
+      bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      console.error('Error fetching schedule:', error);
+      bot.sendMessage(chatId, '❌ Er ging iets mis bij het ophalen van je rooster.');
+    }
+  });
+
+  // /docenten command - show teachers (students only)
+  bot.onText(/\/docenten/, async (msg) => {
+    const chatId = msg.chat.id;
+    const student = await getStudentByChatId(chatId);
+
+    if (!student) {
+      bot.sendMessage(
+        chatId,
+        '❌ Je account is nog niet gekoppeld.\n\n' +
+        'Gebruik /start [CODE] om je account te koppelen.'
+      );
+      return;
+    }
+
+    try {
+      const teachers = await teacherDb.findByStudentId(student.id);
+
+      if (teachers.length === 0) {
+        bot.sendMessage(
+          chatId,
+          `📚 Geen docenten gevonden.\n\n` +
+          'Vraag je ouder om docenten toe te voegen in de app.'
+        );
+        return;
+      }
+
+      let message = `👨‍🏫 *Jouw Docenten*\n\n`;
+
+      for (const teacher of teachers) {
+        message += `*${teacher.name}*\n`;
+
+        if (teacher.teaching_subject) {
+          message += `📚 ${teacher.teaching_subject}\n`;
+        }
+
+        if (teacher.email) {
+          message += `📧 ${teacher.email}\n`;
+        }
+
+        if (teacher.phone) {
+          message += `📞 ${teacher.phone}\n`;
+        }
+
+        message += '\n';
+      }
+
+      bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      console.error('Error fetching teachers:', error);
+      bot.sendMessage(chatId, '❌ Er ging iets mis bij het ophalen van je docenten.');
+    }
+  });
+
   // /link command - for parents
   bot.onText(/\/link(?:\s+(.+))?/, async (msg, match) => {
     const linkCode = match[1]?.trim();
@@ -330,6 +448,8 @@ function setupCommands() {
         `/today - Huiswerk voor vandaag\n` +
         `/week - Huiswerk voor deze week\n` +
         `/done [vak] - Markeer huiswerk als af\n` +
+        `/rooster - Rooster voor vandaag\n` +
+        `/docenten - Lijst van je docenten\n` +
         `/help - Dit helpbericht\n\n` +
         `Je kunt ook typen: "engels af"`,
         { parse_mode: 'Markdown' }

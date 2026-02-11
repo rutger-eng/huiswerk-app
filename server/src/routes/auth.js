@@ -12,7 +12,7 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 // Register new parent account
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, phone, address, postal_code, city, birth_date } = req.body;
 
     // Validation
     if (!email || !password || !name) {
@@ -34,6 +34,18 @@ router.post('/register', async (req, res) => {
 
     // Create user
     const userId = await userDb.create(email, passwordHash, name, 'parent');
+
+    // Update with additional fields if provided
+    const updates = {};
+    if (phone !== undefined) updates.phone = phone?.trim() || null;
+    if (address !== undefined) updates.address = address?.trim() || null;
+    if (postal_code !== undefined) updates.postal_code = postal_code?.trim() || null;
+    if (city !== undefined) updates.city = city?.trim() || null;
+    if (birth_date !== undefined) updates.birth_date = birth_date || null;
+
+    if (Object.keys(updates).length > 0) {
+      await userDb.update(userId, updates);
+    }
 
     // Generate JWT token
     const token = jwt.sign(
@@ -117,6 +129,11 @@ router.get('/me', authenticateToken, async (req, res) => {
       email: user.email,
       name: user.name,
       role: user.role,
+      phone: user.phone,
+      address: user.address,
+      postal_code: user.postal_code,
+      city: user.city,
+      birth_date: user.birth_date,
       telegram_linked: user.telegram_linked === 1,
       telegram_chat_id: user.telegram_chat_id
     });
@@ -163,6 +180,47 @@ router.get('/telegram-status', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Get telegram status error:', error);
     res.status(500).json({ error: 'Failed to get telegram status' });
+  }
+});
+
+// Update parent profile
+router.put('/profile', authenticateToken, async (req, res) => {
+  try {
+    const { name, phone, address, postal_code, city, birth_date } = req.body;
+
+    const updates = {};
+    if (name !== undefined && name.trim() !== '') updates.name = name.trim();
+    if (phone !== undefined) updates.phone = phone?.trim() || null;
+    if (address !== undefined) updates.address = address?.trim() || null;
+    if (postal_code !== undefined) updates.postal_code = postal_code?.trim() || null;
+    if (city !== undefined) updates.city = city?.trim() || null;
+    if (birth_date !== undefined) updates.birth_date = birth_date || null;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No valid updates provided' });
+    }
+
+    await userDb.update(req.user.id, updates);
+
+    const user = await userDb.findById(req.user.id);
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        phone: user.phone,
+        address: user.address,
+        postal_code: user.postal_code,
+        city: user.city,
+        birth_date: user.birth_date,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 

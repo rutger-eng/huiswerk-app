@@ -83,13 +83,24 @@ router.get('/:id', authenticateToken, requireParent, async (req, res) => {
 // Create new student
 router.post('/', authenticateToken, requireParent, async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, year, level, birth_date, school_id } = req.body;
 
     if (!name || name.trim() === '') {
       return res.status(400).json({ error: 'Student name is required' });
     }
 
     const studentId = await studentDb.create(name.trim(), req.user.id);
+
+    // Update with additional fields if provided
+    const updates = {};
+    if (year !== undefined) updates.year = year;
+    if (level !== undefined) updates.level = level?.trim() || null;
+    if (birth_date !== undefined) updates.birth_date = birth_date || null;
+    if (school_id !== undefined) updates.school_id = school_id || null;
+
+    if (Object.keys(updates).length > 0) {
+      await studentDb.update(studentId, updates);
+    }
 
     const student = await studentDb.findById(studentId);
 
@@ -107,7 +118,7 @@ router.post('/', authenticateToken, requireParent, async (req, res) => {
 router.put('/:id', authenticateToken, requireParent, async (req, res) => {
   try {
     const studentId = parseInt(req.params.id);
-    const { name } = req.body;
+    const { name, year, level, birth_date, school_id } = req.body;
 
     // Check ownership
     const hasAccess = await checkStudentOwnership(req.user.id, studentId);
@@ -116,9 +127,13 @@ router.put('/:id', authenticateToken, requireParent, async (req, res) => {
     }
 
     const updates = {};
-    if (name && name.trim() !== '') {
+    if (name !== undefined && name.trim() !== '') {
       updates.name = name.trim();
     }
+    if (year !== undefined) updates.year = year;
+    if (level !== undefined) updates.level = level?.trim() || null;
+    if (birth_date !== undefined) updates.birth_date = birth_date || null;
+    if (school_id !== undefined) updates.school_id = school_id || null;
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No valid updates provided' });

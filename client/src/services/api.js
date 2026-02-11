@@ -36,14 +36,17 @@ api.interceptors.response.use(
 
 // Auth API
 export const authApi = {
-  register: (email, password, name) =>
-    api.post('/auth/register', { email, password, name }),
+  register: (email, password, name, phone, address, postal_code, city, birth_date) =>
+    api.post('/auth/register', { email, password, name, phone, address, postal_code, city, birth_date }),
 
   login: (email, password) =>
     api.post('/auth/login', { email, password }),
 
   getMe: () =>
     api.get('/auth/me'),
+
+  updateProfile: (data) =>
+    api.put('/auth/profile', data),
 
   getTelegramLink: () =>
     api.get('/auth/telegram-link'),
@@ -60,8 +63,8 @@ export const studentsApi = {
   getById: (id) =>
     api.get(`/students/${id}`),
 
-  create: (name) =>
-    api.post('/students', { name }),
+  create: (data) =>
+    api.post('/students', data),
 
   update: (id, data) =>
     api.put(`/students/${id}`, data),
@@ -101,6 +104,78 @@ export const homeworkApi = {
 
   delete: (id) =>
     api.delete(`/homework/${id}`)
+};
+
+// Schools API
+export const schoolsApi = {
+  getAll: () =>
+    api.get('/schools'),
+
+  getById: (id) =>
+    api.get(`/schools/${id}`),
+
+  search: (query) =>
+    api.get(`/schools/search?q=${encodeURIComponent(query)}`),
+
+  create: (data) =>
+    api.post('/schools', data),
+
+  update: (id, data) =>
+    api.put(`/schools/${id}`, data),
+
+  delete: (id) =>
+    api.delete(`/schools/${id}`)
+};
+
+// Teachers API
+export const teachersApi = {
+  getAll: () =>
+    api.get('/teachers'),
+
+  getById: (id) =>
+    api.get(`/teachers/${id}`),
+
+  getByStudent: (studentId) =>
+    api.get(`/teachers/student/${studentId}`),
+
+  getBySchool: (schoolId) =>
+    api.get(`/teachers/school/${schoolId}`),
+
+  create: (data) =>
+    api.post('/teachers', data),
+
+  update: (id, data) =>
+    api.put(`/teachers/${id}`, data),
+
+  delete: (id) =>
+    api.delete(`/teachers/${id}`)
+};
+
+// Schedule API
+export const scheduleApi = {
+  getByStudent: (studentId) =>
+    api.get(`/schedule/student/${studentId}`),
+
+  getToday: (studentId) =>
+    api.get(`/schedule/student/${studentId}/today`),
+
+  getByDay: (studentId, dayOfWeek) =>
+    api.get(`/schedule/student/${studentId}/day/${dayOfWeek}`),
+
+  getById: (id) =>
+    api.get(`/schedule/${id}`),
+
+  create: (data) =>
+    api.post('/schedule', data),
+
+  update: (id, data) =>
+    api.put(`/schedule/${id}`, data),
+
+  delete: (id) =>
+    api.delete(`/schedule/${id}`),
+
+  deleteAll: (studentId) =>
+    api.delete(`/schedule/student/${studentId}/all`)
 };
 
 export default api;
