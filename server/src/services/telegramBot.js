@@ -1,6 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { studentDb, homeworkDb, userDb } from '../database/db-adapter.js';
 import * as parentCommands from './parentTelegramCommands.js';
+import { handleAIChat } from './aiChatHandler.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const RAILWAY_PUBLIC_URL = process.env.RAILWAY_PUBLIC_DOMAIN
@@ -355,18 +356,36 @@ function setupMessageHandler() {
     if (msg.text?.startsWith('/')) return;
 
     const chatId = msg.chat.id;
-    const text = msg.text?.toLowerCase() || '';
+    const text = msg.text || '';
 
     const { type, user } = await getUserType(chatId);
 
+    // If not linked, ignore
+    if (type === 'none') return;
+
+    // Use AI chat handler if OpenAI is configured
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const response = await handleAIChat(chatId, text, type, user);
+        bot.sendMessage(chatId, response, { parse_mode: 'Markdown' });
+        return;
+      } catch (error) {
+        console.error('AI chat error:', error);
+        // Fall back to old behavior on error
+      }
+    }
+
+    // Fallback: old pattern matching behavior
+    const { type: userType, user: userData } = await getUserType(chatId);
+
     // Handle parent messages (for adding homework)
-    if (type === 'parent') {
-      await parentCommands.parseParentAddMessage(bot, chatId, user, msg.text);
+    if (userType === 'parent') {
+      await parentCommands.parseParentAddMessage(bot, chatId, userData, msg.text);
       return;
     }
 
     // Check if student is linked
-    const student = user;
+    const student = userData;
     if (!student) return;
 
     // Parse natural language for "done" actions
