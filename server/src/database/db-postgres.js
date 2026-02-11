@@ -31,6 +31,19 @@ async function initializeDatabase() {
       )
     `);
 
+    // Add Telegram fields to users table if they don't exist (for parent Telegram linking)
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='telegram_chat_id') THEN
+          ALTER TABLE users ADD COLUMN telegram_chat_id TEXT;
+          ALTER TABLE users ADD COLUMN telegram_linked INTEGER DEFAULT 0;
+          ALTER TABLE users ADD COLUMN telegram_link_code TEXT;
+          ALTER TABLE users ADD COLUMN telegram_link_expires TIMESTAMP;
+        END IF;
+      END $$;
+    `);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS students (
         id SERIAL PRIMARY KEY,
@@ -92,6 +105,37 @@ export const userDb = {
     const fields = Object.keys(updates).map((key, i) => `${key} = $${i + 1}`).join(', ');
     const values = [...Object.values(updates), id];
     await pool.query(`UPDATE users SET ${fields} WHERE id = $${values.length}`, values);
+  },
+
+  // Parent Telegram operations
+  findByTelegramChatId: async (chatId) => {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE telegram_chat_id = $1',
+      [chatId]
+    );
+    return result.rows[0];
+  },
+
+  findByLinkCode: async (linkCode) => {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE telegram_link_code = $1 AND telegram_link_expires > NOW()',
+      [linkCode]
+    );
+    return result.rows[0];
+  },
+
+  setLinkCode: async (id, linkCode, expiresAt) => {
+    await pool.query(
+      'UPDATE users SET telegram_link_code = $1, telegram_link_expires = $2 WHERE id = $3',
+      [linkCode, expiresAt, id]
+    );
+  },
+
+  linkTelegram: async (id, chatId) => {
+    await pool.query(
+      'UPDATE users SET telegram_chat_id = $1, telegram_linked = 1, telegram_link_code = NULL, telegram_link_expires = NULL WHERE id = $2',
+      [chatId, id]
+    );
   }
 };
 

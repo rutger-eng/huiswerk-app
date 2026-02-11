@@ -43,7 +43,13 @@ export const authApi = {
     api.post('/auth/login', { email, password }),
 
   getMe: () =>
-    api.get('/auth/me')
+    api.get('/auth/me'),
+
+  getTelegramLink: () =>
+    api.get('/auth/telegram-link'),
+
+  getTelegramStatus: () =>
+    api.get('/auth/telegram-status')
 };
 
 // Students API

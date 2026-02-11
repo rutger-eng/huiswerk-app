@@ -28,6 +28,10 @@ function initializeDatabase() {
         password_hash TEXT NOT NULL,
         name TEXT NOT NULL,
         role TEXT DEFAULT 'parent',
+        telegram_chat_id TEXT,
+        telegram_linked INTEGER DEFAULT 0,
+        telegram_link_code TEXT,
+        telegram_link_expires DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -123,6 +127,32 @@ export const userDb = {
     const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
     const values = [...Object.values(updates), id];
     return await runQuery(`UPDATE users SET ${fields} WHERE id = ?`, values);
+  },
+
+  // Parent Telegram operations
+  findByTelegramChatId: async (chatId) => {
+    return await getOne('SELECT * FROM users WHERE telegram_chat_id = ?', [chatId]);
+  },
+
+  findByLinkCode: async (linkCode) => {
+    return await getOne(
+      'SELECT * FROM users WHERE telegram_link_code = ? AND telegram_link_expires > datetime("now")',
+      [linkCode]
+    );
+  },
+
+  setLinkCode: async (id, linkCode, expiresAt) => {
+    return await runQuery(
+      'UPDATE users SET telegram_link_code = ?, telegram_link_expires = ? WHERE id = ?',
+      [linkCode, expiresAt, id]
+    );
+  },
+
+  linkTelegram: async (id, chatId) => {
+    return await runQuery(
+      'UPDATE users SET telegram_chat_id = ?, telegram_linked = 1, telegram_link_code = NULL, telegram_link_expires = NULL WHERE id = ?',
+      [chatId, id]
+    );
   }
 };
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../App';
-import { studentsApi } from '../../services/api';
+import { studentsApi, authApi } from '../../services/api';
 
 export default function ParentDashboard() {
   const [students, setStudents] = useState([]);
@@ -10,12 +10,15 @@ export default function ParentDashboard() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newStudentName, setNewStudentName] = useState('');
   const [addingStudent, setAddingStudent] = useState(false);
+  const [telegramStatus, setTelegramStatus] = useState(null);
+  const [parentLinkCode, setParentLinkCode] = useState(null);
 
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchStudents();
+    fetchTelegramStatus();
   }, []);
 
   const fetchStudents = async () => {
@@ -26,6 +29,25 @@ export default function ParentDashboard() {
       setError('Fout bij ophalen studenten');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTelegramStatus = async () => {
+    try {
+      const response = await authApi.getTelegramStatus();
+      setTelegramStatus(response.data);
+    } catch (err) {
+      console.error('Error fetching Telegram status:', err);
+    }
+  };
+
+  const generateParentLinkCode = async () => {
+    try {
+      const response = await authApi.getTelegramLink();
+      setParentLinkCode(response.data.linkCode);
+      fetchTelegramStatus();
+    } catch (err) {
+      setError('Fout bij genereren link code');
     }
   };
 
@@ -82,6 +104,59 @@ export default function ParentDashboard() {
         {error && (
           <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
             {error}
+          </div>
+        )}
+
+        {/* Parent Telegram Section */}
+        {telegramStatus && (
+          <div className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  🤖 Telegram voor Ouders
+                </h3>
+                {telegramStatus.linked ? (
+                  <div>
+                    <p className="text-green-700 font-medium flex items-center mb-2">
+                      <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      Gekoppeld aan Telegram
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Je kunt nu via Telegram huiswerk toevoegen en status checken!
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Commands: /status, /today, /add, /help
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-gray-700 mb-3">
+                      Koppel je Telegram om snel huiswerk toe te voegen en status te checken via de bot!
+                    </p>
+                    {parentLinkCode || telegramStatus.linkCode ? (
+                      <div className="bg-white p-4 rounded border border-blue-300">
+                        <p className="text-sm text-gray-700 mb-1 font-medium">Link code:</p>
+                        <p className="text-2xl font-mono font-bold text-blue-600 mb-2">
+                          {parentLinkCode || telegramStatus.linkCode}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Stuur op Telegram naar je bot: <code className="bg-gray-100 px-2 py-1 rounded">/link {parentLinkCode || telegramStatus.linkCode}</code>
+                        </p>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={generateParentLinkCode}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                      >
+                        Genereer Link Code
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

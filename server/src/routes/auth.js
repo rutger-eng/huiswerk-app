@@ -1,6 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { userDb } from '../database/db-adapter.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -115,11 +116,53 @@ router.get('/me', authenticateToken, async (req, res) => {
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role
+      role: user.role,
+      telegram_linked: user.telegram_linked === 1,
+      telegram_chat_id: user.telegram_chat_id
     });
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ error: 'Failed to get user' });
+  }
+});
+
+// Generate Telegram link code for parent
+router.get('/telegram-link', authenticateToken, async (req, res) => {
+  try {
+    // Generate unique 8-character code
+    const linkCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+
+    // Code expires in 24 hours
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    await userDb.setLinkCode(req.user.id, linkCode, expiresAt);
+
+    res.json({
+      linkCode,
+      expiresAt,
+      message: 'Link code generated. Send /link ' + linkCode + ' to the Telegram bot'
+    });
+  } catch (error) {
+    console.error('Generate parent link code error:', error);
+    res.status(500).json({ error: 'Failed to generate link code' });
+  }
+});
+
+// Check Telegram link status for parent
+router.get('/telegram-status', authenticateToken, async (req, res) => {
+  try {
+    const user = await userDb.findById(req.user.id);
+
+    res.json({
+      linked: user.telegram_linked === 1,
+      chatId: user.telegram_chat_id,
+      hasLinkCode: !!user.telegram_link_code,
+      linkCode: user.telegram_link_code,
+      linkExpires: user.telegram_link_expires
+    });
+  } catch (error) {
+    console.error('Get telegram status error:', error);
+    res.status(500).json({ error: 'Failed to get telegram status' });
   }
 });
 

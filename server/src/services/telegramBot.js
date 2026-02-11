@@ -1,5 +1,6 @@
 import TelegramBot from 'node-telegram-bot-api';
-import { studentDb, homeworkDb } from '../database/db-adapter.js';
+import { studentDb, homeworkDb, userDb } from '../database/db-adapter.js';
+import * as parentCommands from './parentTelegramCommands.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const RAILWAY_PUBLIC_URL = process.env.RAILWAY_PUBLIC_DOMAIN
@@ -58,6 +59,23 @@ export function getBot() {
 async function getStudentByChatId(chatId) {
   const student = await studentDb.findByTelegramChatId(chatId.toString());
   return student;
+}
+
+// Get parent by chat ID
+async function getParentByChatId(chatId) {
+  const parent = await userDb.findByTelegramChatId(chatId.toString());
+  return parent;
+}
+
+// Check if chat is parent or student
+async function getUserType(chatId) {
+  const parent = await getParentByChatId(chatId);
+  if (parent) return { type: 'parent', user: parent };
+
+  const student = await getStudentByChatId(chatId);
+  if (student) return { type: 'student', user: student };
+
+  return { type: 'none', user: null };
 }
 
 // Format homework item for display
@@ -133,11 +151,18 @@ function setupCommands() {
     }
   });
 
-  // /today command - show today's homework
-  bot.onText(/\/today/, async (msg) => {
+  // /today command - show today's homework (student or parent)
+  bot.onText(/\/today(?:\s+(.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
-    const student = await getStudentByChatId(chatId);
+    const arg = match[1]?.trim();
+    const { type, user } = await getUserType(chatId);
 
+    if (type === 'parent') {
+      await parentCommands.handleParentToday(bot, chatId, user, arg);
+      return;
+    }
+
+    const student = user;
     if (!student) {
       bot.sendMessage(
         chatId,
@@ -171,11 +196,18 @@ function setupCommands() {
     }
   });
 
-  // /week command - show this week's homework
-  bot.onText(/\/week/, async (msg) => {
+  // /week command - show this week's homework (student or parent)
+  bot.onText(/\/week(?:\s+(.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
-    const student = await getStudentByChatId(chatId);
+    const arg = match[1]?.trim();
+    const { type, user } = await getUserType(chatId);
 
+    if (type === 'parent') {
+      await parentCommands.handleParentWeek(bot, chatId, user, arg);
+      return;
+    }
+
+    const student = user;
     if (!student) {
       bot.sendMessage(
         chatId,
@@ -263,22 +295,56 @@ function setupCommands() {
     }
   });
 
-  // /help command
+  // /link command - for parents
+  bot.onText(/\/link(?:\s+(.+))?/, async (msg, match) => {
+    const linkCode = match[1]?.trim();
+    await parentCommands.handleParentLink(bot, msg, linkCode);
+  });
+
+  // /status command - for parents
+  bot.onText(/\/status/, async (msg) => {
+    const chatId = msg.chat.id;
+    const parent = await getParentByChatId(chatId);
+
+    if (!parent) {
+      bot.sendMessage(chatId, '❌ Parent account niet gekoppeld. Gebruik /link [CODE]');
+      return;
+    }
+
+    await parentCommands.handleParentStatus(bot, chatId, parent);
+  });
+
+  // /help command - context-aware
   bot.onText(/\/help/, async (msg) => {
     const chatId = msg.chat.id;
+    const { type, user } = await getUserType(chatId);
 
-    bot.sendMessage(
-      chatId,
-      `📚 *Huiswerk App Commands*\n\n` +
-      `/start [CODE] - Koppel je account\n` +
-      `/today - Huiswerk voor vandaag\n` +
-      `/week - Huiswerk voor deze week\n` +
-      `/done [vak] - Markeer huiswerk als af\n` +
-      `/help - Toon dit helpbericht\n\n` +
-      `Je kunt ook gewoon typen:\n` +
-      `"huiswerk voor engels af" of "engels af"`,
-      { parse_mode: 'Markdown' }
-    );
+    if (type === 'parent') {
+      parentCommands.sendParentHelp(bot, chatId, user);
+    } else if (type === 'student') {
+      bot.sendMessage(
+        chatId,
+        `📚 *Student Commands*\n\n` +
+        `/start [CODE] - Koppel je account\n` +
+        `/today - Huiswerk voor vandaag\n` +
+        `/week - Huiswerk voor deze week\n` +
+        `/done [vak] - Markeer huiswerk als af\n` +
+        `/help - Dit helpbericht\n\n` +
+        `Je kunt ook typen: "engels af"`,
+        { parse_mode: 'Markdown' }
+      );
+    } else {
+      bot.sendMessage(
+        chatId,
+        `👋 Welkom bij de Huiswerk App!\n\n` +
+        `*Voor Students:*\n` +
+        `/start [CODE] - Koppel account\n\n` +
+        `*Voor Ouders:*\n` +
+        `/link [CODE] - Koppel account\n\n` +
+        `Genereer een koppelcode in de web app!`,
+        { parse_mode: 'Markdown' }
+      );
+    }
   });
 }
 
@@ -291,8 +357,16 @@ function setupMessageHandler() {
     const chatId = msg.chat.id;
     const text = msg.text?.toLowerCase() || '';
 
+    const { type, user } = await getUserType(chatId);
+
+    // Handle parent messages (for adding homework)
+    if (type === 'parent') {
+      await parentCommands.parseParentAddMessage(bot, chatId, user, msg.text);
+      return;
+    }
+
     // Check if student is linked
-    const student = await getStudentByChatId(chatId);
+    const student = user;
     if (!student) return;
 
     // Parse natural language for "done" actions
