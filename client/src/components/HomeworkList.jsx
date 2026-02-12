@@ -1,17 +1,25 @@
 import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { nl } from 'date-fns/locale';
+import { Badge, EmptyState, Button } from './ui';
+import { useToast } from '../contexts/ToastContext';
+import { homeworkApi } from '../services/api';
+import { useOptimistic } from '../hooks';
 
 export default function HomeworkList({ homework, onToggleComplete, onDelete }) {
   const [filter, setFilter] = useState('all'); // all, completed, incomplete
   const [subjectFilter, setSubjectFilter] = useState('all');
   const [sortBy, setSortBy] = useState('deadline'); // deadline, subject
+  const toast = useToast();
+
+  // Optimistic updates
+  const { data: optimisticHomework, performUpdate } = useOptimistic(homework);
 
   // Get unique subjects
-  const subjects = [...new Set(homework.map((hw) => hw.subject))].sort();
+  const subjects = [...new Set((optimisticHomework || homework).map((hw) => hw.subject))].sort();
 
   // Filter homework
-  let filteredHomework = homework.filter((hw) => {
+  let filteredHomework = (optimisticHomework || homework).filter((hw) => {
     if (filter === 'completed' && !hw.completed) return false;
     if (filter === 'incomplete' && hw.completed) return false;
     if (subjectFilter !== 'all' && hw.subject !== subjectFilter) return false;
@@ -36,6 +44,48 @@ export default function HomeworkList({ homework, onToggleComplete, onDelete }) {
     groups[date].push(hw);
     return groups;
   }, {});
+
+  // Handle toggle with optimistic update
+  const handleToggle = async (id, completed) => {
+    try {
+      await performUpdate(
+        (optimisticHomework || homework).map((hw) =>
+          hw.id === id ? { ...hw, completed: completed ? 0 : 1 } : hw
+        ),
+        async () => {
+          await homeworkApi.update(id, { completed: !completed });
+          // Call parent callback to update parent state
+          if (onToggleComplete) onToggleComplete(id, completed);
+          return (optimisticHomework || homework).map((hw) =>
+            hw.id === id ? { ...hw, completed: completed ? 0 : 1 } : hw
+          );
+        }
+      );
+      toast.success(completed ? 'Huiswerk heropend' : 'Huiswerk afgerond');
+    } catch (error) {
+      toast.error('Fout bij bijwerken huiswerk');
+    }
+  };
+
+  // Handle delete with optimistic update
+  const handleDelete = async (id) => {
+    if (!confirm('Weet je zeker dat je dit huiswerk wilt verwijderen?')) return;
+
+    try {
+      await performUpdate(
+        (optimisticHomework || homework).filter((hw) => hw.id !== id),
+        async () => {
+          await homeworkApi.delete(id);
+          // Call parent callback to update parent state
+          if (onDelete) onDelete(id);
+          return (optimisticHomework || homework).filter((hw) => hw.id !== id);
+        }
+      );
+      toast.success('Huiswerk verwijderd');
+    } catch (error) {
+      toast.error('Fout bij verwijderen huiswerk');
+    }
+  };
 
   return (
     <div className="bg-white rounded-lg shadow">
@@ -88,27 +138,32 @@ export default function HomeworkList({ homework, onToggleComplete, onDelete }) {
         </div>
 
         <div className="text-sm text-gray-600">
-          {filteredHomework.length} van {homework.length} items
+          {filteredHomework.length} van {(optimisticHomework || homework).length} items
         </div>
       </div>
 
       {/* Homework List */}
       {filteredHomework.length === 0 ? (
-        <div className="p-8 text-center text-gray-500">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          <p className="mt-2">Geen huiswerk gevonden</p>
+        <div className="p-8">
+          <EmptyState
+            title="Geen huiswerk gevonden"
+            description="Er zijn geen huiswerk items die aan je filters voldoen."
+            icon={
+              <svg
+                className="h-12 w-12 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+            }
+          />
         </div>
       ) : sortBy === 'deadline' ? (
         // Grouped by date view
@@ -124,8 +179,8 @@ export default function HomeworkList({ homework, onToggleComplete, onDelete }) {
                 <HomeworkItem
                   key={hw.id}
                   homework={hw}
-                  onToggleComplete={onToggleComplete}
-                  onDelete={onDelete}
+                  onToggleComplete={handleToggle}
+                  onDelete={handleDelete}
                 />
               ))}
             </div>
@@ -138,8 +193,8 @@ export default function HomeworkList({ homework, onToggleComplete, onDelete }) {
             <HomeworkItem
               key={hw.id}
               homework={hw}
-              onToggleComplete={onToggleComplete}
-              onDelete={onDelete}
+              onToggleComplete={handleToggle}
+              onDelete={handleDelete}
               showDate
             />
           ))}
@@ -153,13 +208,13 @@ function HomeworkItem({ homework, onToggleComplete, onDelete, showDate = false }
   const isOverdue = new Date(homework.deadline) < new Date() && !homework.completed;
 
   return (
-    <div className="p-4 border-b border-gray-200 last:border-b-0 flex items-center justify-between hover:bg-gray-50">
+    <div className="p-4 border-b border-gray-200 last:border-b-0 flex items-center justify-between hover:bg-gray-50 transition-colors">
       <div className="flex items-center flex-1">
         <input
           type="checkbox"
           checked={homework.completed === 1}
           onChange={() => onToggleComplete(homework.id, homework.completed)}
-          className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+          className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
         />
         <div className="ml-4 flex-1">
           <div className="flex items-center gap-2">
@@ -170,9 +225,7 @@ function HomeworkItem({ homework, onToggleComplete, onDelete, showDate = false }
             >
               {homework.subject}
             </h3>
-            {isOverdue && (
-              <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Achterstallig</span>
-            )}
+            {isOverdue && <Badge variant="danger">Achterstallig</Badge>}
           </div>
           <p className="text-sm text-gray-600">{homework.description}</p>
           {showDate && (
@@ -182,12 +235,13 @@ function HomeworkItem({ homework, onToggleComplete, onDelete, showDate = false }
           )}
         </div>
       </div>
-      <button
+      <Button
+        variant="danger"
+        size="sm"
         onClick={() => onDelete(homework.id)}
-        className="text-red-600 hover:text-red-800 text-sm ml-4"
       >
         Verwijder
-      </button>
+      </Button>
     </div>
   );
 }

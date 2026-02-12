@@ -10,6 +10,7 @@ import Calendar from './components/Calendar';
 import HomeworkForm from './components/HomeworkForm';
 import TextParser from './components/TextParser';
 import { authApi } from './services/api';
+import { ToastProvider } from './contexts/ToastContext';
 import './styles/schedule.css';
 
 // Auth Context
@@ -55,54 +56,56 @@ function App() {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
-      <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route
-            path="/login"
-            element={!user ? <Login /> : <Navigate to="/" />}
-          />
-          <Route
-            path="/register"
-            element={!user ? <Register /> : <Navigate to="/" />}
-          />
+    <ToastProvider>
+      <AuthContext.Provider value={{ user, login, logout }}>
+        <BrowserRouter>
+          <Routes>
+            {/* Public routes */}
+            <Route
+              path="/login"
+              element={!user ? <Login /> : <Navigate to="/" />}
+            />
+            <Route
+              path="/register"
+              element={!user ? <Register /> : <Navigate to="/" />}
+            />
 
-          {/* Protected routes */}
-          <Route
-            path="/"
-            element={user ? <ParentDashboard /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/dashboard"
-            element={user ? <ParentDashboard /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/student/:id"
-            element={user ? <StudentDetail /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/student/:id/homework"
-            element={user ? <Dashboard /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/student/:id/calendar"
-            element={user ? <Calendar /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/student/:id/add"
-            element={user ? <HomeworkForm /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/student/:id/parse"
-            element={user ? <TextParser /> : <Navigate to="/login" />}
-          />
+            {/* Protected routes */}
+            <Route
+              path="/"
+              element={user ? <ParentDashboard /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/dashboard"
+              element={user ? <ParentDashboard /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/student/:id"
+              element={user ? <StudentDetail /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/student/:id/homework"
+              element={user ? <Dashboard /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/student/:id/calendar"
+              element={user ? <Calendar /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/student/:id/add"
+              element={user ? <HomeworkForm /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/student/:id/parse"
+              element={user ? <TextParser /> : <Navigate to="/login" />}
+            />
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthContext.Provider>
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthContext.Provider>
+    </ToastProvider>
   );
 }
 

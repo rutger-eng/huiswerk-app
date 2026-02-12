@@ -1,92 +1,76 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { studentsApi, homeworkApi } from '../services/api';
+import { useParams, Link } from 'react-router-dom';
+import { useStudent, useHomework, useTelegramStatus, useTelegramLink } from '../hooks';
+import { useToast } from '../contexts/ToastContext';
+import { Button, Card, SkeletonCard, Badge } from './ui';
 import HomeworkList from './HomeworkList';
 
 export default function Dashboard() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const [student, setStudent] = useState(null);
-  const [homework, setHomework] = useState([]);
-  const [telegramStatus, setTelegramStatus] = useState(null);
-  const [linkCode, setLinkCode] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const toast = useToast();
 
+  // Custom hooks voor data fetching
+  const { loading: studentLoading, error: studentError, data: student, execute: refetchStudent } = useStudent(id);
+  const { loading: homeworkLoading, error: homeworkError, data: homework, execute: refetchHomework } = useHomework(id);
+  const { data: telegramStatus, execute: refetchTelegram } = useTelegramStatus(id);
+  const { data: linkCodeData, execute: generateLink } = useTelegramLink(id, false);
+
+  // Show error toasts
   useEffect(() => {
-    fetchStudentData();
-    fetchTelegramStatus();
-  }, [id]);
+    if (studentError) toast.error('Fout bij ophalen student gegevens');
+    if (homeworkError) toast.error('Fout bij ophalen huiswerk');
+  }, [studentError, homeworkError]);
 
-  const fetchStudentData = async () => {
+  const handleGenerateLinkCode = async () => {
     try {
-      const [studentRes, homeworkRes] = await Promise.all([
-        studentsApi.getById(id),
-        homeworkApi.getByStudent(id)
-      ]);
-
-      setStudent(studentRes.data);
-      setHomework(homeworkRes.data);
+      await generateLink();
+      toast.success('Link code gegenereerd');
+      refetchTelegram();
     } catch (err) {
-      setError('Fout bij ophalen gegevens');
-    } finally {
-      setLoading(false);
+      toast.error('Fout bij genereren link code');
     }
   };
 
-  const fetchTelegramStatus = async () => {
-    try {
-      const response = await studentsApi.getTelegramStatus(id);
-      setTelegramStatus(response.data);
-    } catch (err) {
-      console.error('Error fetching Telegram status:', err);
-    }
+  // Callbacks voor HomeworkList (voor refetch na updates)
+  const handleToggleComplete = () => {
+    refetchHomework();
+    refetchStudent();
   };
 
-  const generateLinkCode = async () => {
-    try {
-      const response = await studentsApi.getTelegramLink(id);
-      setLinkCode(response.data.linkCode);
-      fetchTelegramStatus();
-    } catch (err) {
-      setError('Fout bij genereren link code');
-    }
+  const handleDeleteHomework = () => {
+    refetchHomework();
+    refetchStudent();
   };
 
-  const handleToggleComplete = async (homeworkId, completed) => {
-    try {
-      await homeworkApi.update(homeworkId, { completed: !completed });
-      fetchStudentData();
-    } catch (err) {
-      setError('Fout bij updaten huiswerk');
-    }
-  };
-
-  const handleDeleteHomework = async (homeworkId) => {
-    if (!confirm('Weet je zeker dat je dit huiswerk wilt verwijderen?')) return;
-
-    try {
-      await homeworkApi.delete(homeworkId);
-      fetchStudentData();
-    } catch (err) {
-      setError('Fout bij verwijderen huiswerk');
-    }
-  };
-
-  if (loading) {
+  // Loading state met skeleton - BENTO GRID
+  if (studentLoading || homeworkLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Laden...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-white shadow">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <Link to="/" className="text-sm text-blue-600 hover:text-blue-800 mb-2 block">
+              ← Terug naar overzicht
+            </Link>
+            <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"></div>
+          </div>
+        </header>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <SkeletonCard lines={2} />
+            <SkeletonCard lines={2} />
+            <SkeletonCard lines={2} />
+          </div>
+          <SkeletonCard lines={5} />
+        </main>
       </div>
     );
   }
 
-  const todayHomework = homework.filter(
+  const todayHomework = (homework || []).filter(
     (hw) => new Date(hw.deadline).toDateString() === new Date().toDateString()
   );
+
+  const pendingHomework = (homework || []).filter((hw) => !hw.completed);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -101,58 +85,52 @@ export default function Dashboard() {
               <h1 className="text-2xl font-bold text-gray-900">{student?.name}</h1>
             </div>
             <div className="flex gap-3">
-              <Link
-                to={`/student/${id}/calendar`}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => window.location.href = `/student/${id}/calendar`}
               >
                 Kalender
-              </Link>
-              <Link
-                to={`/student/${id}/parse`}
-                className="px-4 py-2 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700"
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.href = `/student/${id}/parse`}
               >
                 Tekst Plakken
-              </Link>
-              <Link
-                to={`/student/${id}/add`}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => window.location.href = `/student/${id}/add`}
               >
                 + Huiswerk
-              </Link>
+              </Button>
             </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-            {error}
-          </div>
-        )}
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* Stats Cards - BENTO GRID */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {/* Today's Homework */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <Card>
             <h3 className="text-sm font-medium text-gray-600 mb-2">Vandaag</h3>
             <p className="text-3xl font-bold text-gray-900">{todayHomework.length}</p>
             <p className="text-sm text-gray-500 mt-1">
               {todayHomework.filter((hw) => hw.completed).length} afgerond
             </p>
-          </div>
+          </Card>
 
           {/* Total Homework */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <Card>
             <h3 className="text-sm font-medium text-gray-600 mb-2">Totaal Openstaand</h3>
-            <p className="text-3xl font-bold text-gray-900">
-              {homework.filter((hw) => !hw.completed).length}
-            </p>
-            <p className="text-sm text-gray-500 mt-1">van {homework.length} totaal</p>
-          </div>
+            <p className="text-3xl font-bold text-gray-900">{pendingHomework.length}</p>
+            <p className="text-sm text-gray-500 mt-1">van {(homework || []).length} totaal</p>
+          </Card>
 
-          {/* Telegram Status */}
-          <div className="bg-white rounded-lg shadow p-6">
+          {/* Telegram Status - Larger card */}
+          <Card className="md:col-span-2 lg:col-span-1">
             <h3 className="text-sm font-medium text-gray-600 mb-2">Telegram</h3>
             {telegramStatus?.linked ? (
               <div>
@@ -170,46 +148,48 @@ export default function Dashboard() {
               </div>
             ) : (
               <div>
-                <p className="text-orange-600 font-medium mb-2">Niet gekoppeld</p>
-                {linkCode || telegramStatus?.linkCode ? (
+                <Badge variant="warning" className="mb-2">Niet gekoppeld</Badge>
+                {linkCodeData?.linkCode || telegramStatus?.linkCode ? (
                   <div className="bg-blue-50 p-3 rounded mt-2">
                     <p className="text-sm text-gray-700 mb-1">Link code:</p>
                     <p className="text-lg font-mono font-bold text-blue-600">
-                      {linkCode || telegramStatus.linkCode}
+                      {linkCodeData?.linkCode || telegramStatus.linkCode}
                     </p>
                     <p className="text-xs text-gray-600 mt-2">
-                      Stuur op Telegram: /start {linkCode || telegramStatus.linkCode}
+                      Stuur op Telegram: <code className="bg-white px-2 py-1 rounded">/start {linkCodeData?.linkCode || telegramStatus.linkCode}</code>
                     </p>
                   </div>
                 ) : (
-                  <button
-                    onClick={generateLinkCode}
-                    className="text-sm text-blue-600 hover:text-blue-800"
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleGenerateLinkCode}
                   >
                     Genereer link code
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
-          </div>
+          </Card>
         </div>
 
-        {/* Today's Homework */}
+        {/* Today's Homework Card - Full width */}
         {todayHomework.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Huiswerk voor Vandaag</h2>
-            <div className="bg-white rounded-lg shadow">
+          <Card title="Huiswerk voor Vandaag" className="mb-8">
+            <div className="divide-y divide-gray-200">
               {todayHomework.map((hw) => (
                 <div
                   key={hw.id}
-                  className="p-4 border-b border-gray-200 last:border-b-0 flex items-center justify-between"
+                  className="py-3 flex items-center justify-between hover:bg-gray-50 px-2 -mx-2 rounded transition-colors"
                 >
                   <div className="flex items-center flex-1">
                     <input
                       type="checkbox"
                       checked={hw.completed === 1}
-                      onChange={() => handleToggleComplete(hw.id, hw.completed)}
-                      className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                      onChange={() => {
+                        handleToggleComplete();
+                      }}
+                      className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
                     />
                     <div className="ml-4">
                       <h3
@@ -222,27 +202,20 @@ export default function Dashboard() {
                       <p className="text-sm text-gray-600">{hw.description}</p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDeleteHomework(hw.id)}
-                    className="text-red-600 hover:text-red-800 text-sm ml-4"
-                  >
-                    Verwijder
-                  </button>
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         )}
 
         {/* All Homework */}
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Al het Huiswerk</h2>
+        <Card title="Al het Huiswerk">
           <HomeworkList
-            homework={homework}
+            homework={homework || []}
             onToggleComplete={handleToggleComplete}
             onDelete={handleDeleteHomework}
           />
-        </div>
+        </Card>
       </main>
     </div>
   );
